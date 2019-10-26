@@ -1,0 +1,176 @@
+﻿@model IFileRepository
+
+<form>
+    @if (Model.FileNames == null || Model.FileNames.Count() == 0)
+    {
+        <h3>Files was not found</h3>
+    }
+    else
+    {
+        <table align="center">
+            @if (!string.IsNullOrEmpty(Model.SelectedFile))
+            {
+                var database = Model.SelectedFile.Split("\\").Last();
+                <tr>
+                    <td width="200" height="60"><label><strong>Database name</strong></label></td>
+                    <td><label>@database</label></td>
+                </tr>
+                <tr>
+                    <td><label><strong>File path</strong></label></td>
+                    <td><label>@Model.SelectedFile</label></td>
+                    <td><button type="button" id="filesListBtn">...</button></td>
+                </tr>
+                @if (Model.FileData == null)
+                {
+                    <tr>
+                        <td height="60">
+                            <button type="submit" formmethod="post">Показать результат</button>
+                        </td>
+                    </tr>
+                }
+            }
+        </table>
+    }
+
+   @if (Model.FileData != null && Model.FileData.Count() > 1)
+    {
+        <br /><br />
+        <table id="tableFileData" border="1" align="center">
+       @{
+            int headLineLength = -1;
+
+           @for(var line = 0; line < Model.FileData.Count(); line++)
+            {
+                var lineData = Model.FileData[line].Split("\t");
+            <tr>
+               @for (var column = 0; column < lineData.Length; column++)
+                {
+                    var data = lineData[column];
+                    var key = (line.ToString() + ',' + column.ToString());
+                    if (line == 0)
+                    {
+                        headLineLength = lineData.Length;
+                        <th><input name="@key" value="@data" readonly /></th>
+                    }
+                    else
+                    {
+                        @:<td><input name="@key" value="@data" onchange="tableDataChanged(this)" /></td>
+                    }
+                }
+               @for (var i = lineData.Length; i < headLineLength; i++)
+                {
+                    var key = (line.ToString() + ',' + i.ToString());
+                    @:<td><input name="@key" onchange="tableDataChanged(this)" /></td>
+                }
+            </tr>
+            }
+            <tr id="lastRow">
+                <td style="border: hidden"><button type="button" onclick="addLine()">+</button></td>
+                <td style="border: hidden"></td>
+                <td style="border: hidden">
+                    <button type="button" id="saveBtn" style="float: right; display: none;">
+                        Save
+                    </button>
+                </td>
+            </tr>
+        }
+        </table>
+    }
+    <h4 id="savedLabel" style="display: none; text-align: center;"><label>Saved</label></h4>
+    
+    <div id="selectFileModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h4>Доступные файлы</h4>
+
+            @foreach (var filename in Model.FileNames)
+            {
+                <button class="select-file-button" type="submit" name="newSelected" value="@(filename)" formmethod="post">@filename</button>
+                <br />
+            }
+        </div>
+    </div>
+    <input id="selectedFile" hidden="hidden" name="selected" value="@Model.SelectedFile" />
+</form>
+
+
+<script>
+    var changeDict = new Map();
+    var selectedFile = document.getElementById("selectedFile");    
+    var modal = document.getElementById("selectFileModal");
+    var btnOpenModal = document.getElementById("filesListBtn");
+    var span = document.getElementsByClassName("close")[0];
+    var saveBtn = document.getElementById("saveBtn");
+    var savedLbl = document.getElementById("savedLabel");
+
+    changeDict.set("selectedFile", selectedFile.value);
+    
+    btnOpenModal.onclick = function () {
+        modal.style.display = "block";
+    }
+        
+    span.onclick = function () {
+        modal.style.display = "none";
+    }
+    
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    function mapToJsonObj(inputMap) {
+        let obj = {};
+
+        inputMap.forEach(function (value, key) {
+            obj[key] = value
+        });
+
+        return obj;
+    }
+
+    function tableDataChanged(obj) {
+        var name = obj.name;
+        var value = obj.value;
+        changeDict.set(obj.name, obj.value);
+        saveBtn.style.display = "inline";
+        savedLbl.style.display = "none";
+    }
+
+    function addLine(event) {
+        var tbody = document.getElementById("tableFileData").getElementsByTagName("TBODY")[0];
+        var rowNum = tbody.children.length;
+        var tableRef = document.getElementById("tableFileData");        
+        var newRow = tableRef.insertRow(rowNum - 1);
+
+        var cellNum = tbody.children[0].children.length;
+
+        for (let i = 0; i < cellNum; i++) {
+            let newCell = newRow.insertCell();
+            let newInput = document.createElement('input');
+            newInput.name = (rowNum - 1).toString() + "," + i.toString();
+            newInput.onchange = () => new tableDataChanged(newInput);
+            newCell.appendChild(newInput);
+        }
+    }
+
+    if (saveBtn != null) {
+        saveBtn.onclick = function event() {
+            $.ajax({
+                type: "post",
+                url: "/Home/Update",
+                dataType: "json",
+                data: mapToJsonObj(changeDict),
+                success: function (response) {
+                    if (response == true) {
+                        savedLbl.style.display = "block";
+                    } else {
+                        alert("Сохранить в файл не удалось");
+                    }
+                }
+            });
+        }
+    }
+</script>
+
+
